@@ -1,94 +1,149 @@
-# Eliza
+# Eliza Trading Bot
 
-## Edit the character files
+A specialized AI trading assistant built on the ElizaOS platform that analyzes market sentiment and generates trade plans.
 
-Open `src/character.ts` to modify the default character. Uncomment and edit.
+## Features
 
-### Custom characters
+- **Sentiment Analysis**: Analyzes social media posts and messages for trading sentiment
+- **Trade Plan Generation**: Creates actionable trade plans based on sentiment analysis
+- **Batch Analysis**: Processes multiple posts simultaneously for comprehensive market analysis
+- **Real-time Processing**: Responds to crypto-related messages with trading insights
 
-To load custom characters instead:
-- Use `pnpm start --characters="path/to/your/character.json"`
-- Multiple character files can be loaded simultaneously
+## Installation
 
-### Add clients
-```
-# in character.ts
-clients: [Clients.TWITTER, Clients.DISCORD],
-
-# in character.json
-clients: ["twitter", "discord"]
-```
-
-## Duplicate the .env.example template
-
+1. Install dependencies:
 ```bash
+npm install
+```
+
+2. Set up your environment variables:
+```bash
+# Copy the example environment file
 cp .env.example .env
+
+# Add your API keys
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-\* Fill out the .env file with your own values.
+## Getting a Gemini API Key
 
-### Add login credentials and keys to .env
-```
-DISCORD_APPLICATION_ID="discord-application-id"
-DISCORD_API_TOKEN="discord-api-token"
-...
-OPENROUTER_API_KEY="sk-xx-xx-xxx"
-...
-TWITTER_USERNAME="username"
-TWITTER_PASSWORD="password"
-TWITTER_EMAIL="your@email.com"
-```
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Sign in with your Google account
+3. Click "Create API Key"
+4. Copy the API key and add it to your `.env` file
 
-## Install dependencies and start your agent
+**Note**: Gemini API has a generous free tier (15 requests per minute, 1500 requests per day), making it perfect for development and testing.
+
+## Usage
+
+### Starting the Simplified Trading Bot (Recommended)
 
 ```bash
-pnpm i && pnpm start
-```
-Note: this requires node to be at least version 22 when you install packages and run the agent.
-
-## Run with Docker
-
-### Build and run Docker Compose (For x86_64 architecture)
-
-#### Edit the docker-compose.yaml file with your environment variables
-
-```yaml
-services:
-    eliza:
-        environment:
-            - OPENROUTER_API_KEY=blahdeeblahblahblah
+npm run start:simple
 ```
 
-#### Run the image
+This bypasses the complex ElizaOS initialization and provides a fast, interactive trading bot.
+
+### Starting the Full ElizaOS Trading Bot
 
 ```bash
-docker compose up
+npm start
 ```
 
-### Build the image with Mac M-Series or aarch64
+**Note**: The full version may take longer to initialize due to complex service dependencies.
 
-Make sure docker is running.
+### Example Interactions
+
+#### Single Message Analysis
+```
+User: "ETH is going to moon!"
+TradeBot: "strong bullish sentiment detected! generating trade plan..."
+```
+
+#### Batch Analysis
+```
+User: "batch"
+TradeBot: "analyzing multiple posts for trading signals..."
+```
+
+## Supported Tokens
+
+The bot currently analyzes sentiment for:
+- ETH (Ethereum)
+- USDC (USD Coin)
+- SOL (Solana)
+- BTC (Bitcoin)
+
+## Trading Actions
+
+### Single Message Analysis
+- Triggers when crypto tokens are mentioned
+- Analyzes sentiment and generates trade plans
+- Provides buy/sell recommendations with price thresholds
+
+### Batch Analysis
+- Processes multiple social media posts
+- Identifies strong trading signals across multiple sources
+- Provides comprehensive market sentiment analysis
+
+## Configuration
+
+The bot can be customized by modifying `src/simple-trading-bot.ts`:
+
+- **Sentiment Threshold**: Adjust the sensitivity (currently 0.3)
+- **Trade Amounts**: Modify the default trade sizes
+- **Price Thresholds**: Change the buy/sell price levels
+- **Supported Tokens**: Add or remove tokens from analysis
+
+## Plugin Architecture
+
+The trading functionality is implemented as a plugin (`src/plugins/trade-planner.ts`) that includes:
+
+- **Providers**: Sentiment analysis and trade plan generation
+- **Actions**: Single and batch trading analysis
+- **Services**: Market data integration (expandable)
+
+## Development
+
+### Adding New Features
+
+1. **New Tokens**: Add to `supportedTokens` array in the plugin
+2. **New Actions**: Create new action handlers in the plugin
+3. **Enhanced Analysis**: Extend the sentiment analysis logic
+
+### Testing
 
 ```bash
-# The --load flag ensures the built image is available locally
-docker buildx build --platform linux/amd64 -t eliza-starter:v1 --load .
+# Build the project
+npm run build
+
+# Start the simplified bot
+npm run start:simple
+
+# Start the full ElizaOS bot
+npm start
 ```
 
-#### Edit the docker-compose-image.yaml file with your environment variables
+## Troubleshooting
 
-```yaml
-services:
-    eliza:
-        environment:
-            - OPENROUTER_API_KEY=blahdeeblahblahblah
-```
+### Common Issues
 
-#### Run the image
+1. **"GEMINI_API_KEY environment variable is required!"**
+   - Make sure you have a `.env` file with your Gemini API key
+   - Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
 
-```bash
-docker compose -f docker-compose-image.yaml up
-```
+2. **Bot stuck on "Initializing LlamaService..."**
+   - Use the simplified version: `npm run start:simple`
+   - This bypasses complex ElizaOS initialization
 
-# Deploy with Railway
+3. **API Rate Limits**
+   - Gemini API has generous limits (15 req/min, 1500 req/day)
+   - If you hit limits, wait a minute and try again
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/aW47_j)
+## Disclaimer
+
+This trading bot is for educational and research purposes. Always do your own research and consider the risks involved in cryptocurrency trading. The bot's recommendations should not be considered as financial advice.
+
+## License
+
+This project is licensed under the same terms as the ElizaOS platform.
