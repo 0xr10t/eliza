@@ -6,7 +6,9 @@ pragma solidity 0.8.20;
 //////////////////////////////////////////////////////////////*/
 import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {ECDSA} from "../lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Platform} from "./PlatformType.sol";
+import {IMockAMM} from "./amm/IMockAMM.sol";
 
 /// @title Agent
 /// @notice Represents an individual trading agent that can execute trades based on authorized signatures
@@ -27,6 +29,7 @@ contract Agent is ReentrancyGuard {
     error Agent__InvalidTokens();
     error Agent__NotAuthorized();
     error Agent__AmountIsZero();
+    error Agent__TokenTransferFailed();
 
     /*//////////////////////////////////////////////////////////////
                               TYPE VARIABLES
@@ -54,6 +57,7 @@ contract Agent is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                               STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
+    IMockAMM private immutable i_mockAMM;
     Platform private platformType;
     address private owner; // address of the user
     bool private isPaused;
@@ -90,9 +94,15 @@ contract Agent is ReentrancyGuard {
     event Agent__TradeExecuted(
         address indexed user,
         address indexed tokenOut,
-        uint256 amountIn
+        uint256 amountIn,
+        uint256 amountOut
     );
-    event Agent__TradeAmount(uint256 amount);
+    /// @param token The token address being transferred
+    /// @param amount The amount transferred to owner
+    event Agent__TokensTransferredToOwner(
+        address indexed token,
+        uint256 amount
+    );
 
     /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
@@ -129,11 +139,13 @@ contract Agent is ReentrancyGuard {
     /// @param _platformType The platform type (Twitter, Telegram, Discord)
     /// @param _authorizedSigner The address authorized to execute trades
     /// @param _owner The owner of the agent
+    /// @param _mockAMM The address of the MockAMM contract
     constructor(
         address[] memory _tokens,
         Platform _platformType,
         address _authorizedSigner,
-        address _owner
+        address _owner,
+        address _mockAMM
     ) payable {
         for (uint256 i = 0; i < _tokens.length; i++) {
             tokensPresent[_tokens[i]] = true;
@@ -141,6 +153,7 @@ contract Agent is ReentrancyGuard {
         platformType = _platformType;
         owner = _owner;
         authorizedSigner = _authorizedSigner;
+        i_mockAMM = IMockAMM(_mockAMM);
         userFunds = msg.value;
         chainId = block.chainid;
         verifyingContract = address(this);
@@ -223,10 +236,21 @@ contract Agent is ReentrancyGuard {
             revert Agent__IncorrectSignature();
         }
 
-        // swapping logic due
+        uint256 amountOut = i_mockAMM.swapETHForTokens{value: data.amountIn}(
+            data.tokenOut,
+            data.minAmountOut
+        );
+
+        _transferTokensToOwner(data.tokenOut, amountOut);
+
         noncesUsed[data.nonce] = true;
 
-        emit Agent__TradeExecuted(msg.sender, data.tokenOut, data.amountIn);
+        emit Agent__TradeExecuted(
+            msg.sender,
+            data.tokenOut,
+            data.amountIn,
+            amountOut
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -248,6 +272,20 @@ contract Agent is ReentrancyGuard {
     function _addFunds(uint256 amount) internal {
         userFunds = userFunds + amount;
         emit Agent__FundsAdded(msg.sender, amount);
+    }
+
+    /// @notice Internal function to transfer tokens to the owner
+    /// @param token The token address to transfer
+    /// @param amount The amount to transfer
+    function _transferTokensToOwner(address token, uint256 amount) internal {
+        if (amount > 0) {
+            IERC20 tokenContract = IERC20(token);
+            bool success = tokenContract.transfer(owner, amount);
+            if (!success) {
+                revert Agent__TokenTransferFailed();
+            }
+            emit Agent__TokensTransferredToOwner(token, amount);
+        }
     }
 
     /// @notice Hashes the TradeData struct according to EIP-712
@@ -329,5 +367,10 @@ contract Agent is ReentrancyGuard {
     /// @notice Returns the EIP-712 domain separator
     function getDomainSeparator() external view returns (bytes32) {
         return DOMAIN_SEPARATOR;
+    }
+
+    /// @notice Returns the MockAMM address
+    function getMockAMM() external view returns (address) {
+        return address(i_mockAMM);
     }
 }

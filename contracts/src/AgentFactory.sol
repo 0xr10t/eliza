@@ -61,11 +61,13 @@ contract AgentFactory {
     /// @param _tokens Array of token addresses that the agent will support
     /// @param _platformType The platform type for the agent (Twitter, Telegram, or Discord)
     /// @param authorizedSigner Address that will be authorized to execute trades
+    /// @param _mockAMM The address of the MockAMM contract
     /// @return agent The address of the newly created Agent contract
     function createAgent(
         address[] memory _tokens,
         Platform _platformType,
-        address authorizedSigner
+        address authorizedSigner,
+        address _mockAMM
     ) external payable returns (Agent) {
         if (_tokens.length == 0) {
             revert Factory__NoTokenPresent();
@@ -81,7 +83,8 @@ contract AgentFactory {
             _tokens,
             _platformType,
             authorizedSigner,
-            msg.sender
+            msg.sender,
+            _mockAMM
         );
 
         AgentInfo memory info = AgentInfo({

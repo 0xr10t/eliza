@@ -1,4 +1,4 @@
-import { Plugin, PluginContext } from "@elizaos/core";
+import { Plugin } from "@elizaos/core";
 
 interface TradeData {
   tokenOut: string;
@@ -16,15 +16,26 @@ interface UserPreferences {
   maxSlippage: number;
 }
 
+interface MockAMMData {
+  address: string;
+  pools: Map<string, {
+    ethReserve: string;
+    tokenReserve: string;
+    totalSupply: string;
+  }>;
+}
+
 class SmartContractConnector {
   private agentContract: any;
   private factoryContract: any;
+  private mockAMMContract: any;
   
   constructor(
     private rpcUrl: string,
     private privateKey: string,
     private agentAddress: string,
-    private factoryAddress: string
+    private factoryAddress: string,
+    private mockAMMAddress: string
   ) {
     // Initialize blockchain connection
   }
@@ -41,7 +52,7 @@ class SmartContractConnector {
   }
 
   async executeTrade(tradeData: TradeData, signature: string): Promise<string> {
-    // Execute trade on smart contract
+    // Execute trade on smart contract using MockAMM
     const mockTxHash = `0x${Math.random().toString(16).substring(2, 66)}`;
     return mockTxHash;
   }
@@ -56,49 +67,57 @@ class SmartContractConnector {
       nonce: Date.now()
     };
   }
+
+  async getMockAMMData(): Promise<MockAMMData> {
+    // Get MockAMM pool information
+    return {
+      address: this.mockAMMAddress,
+      pools: new Map([
+        ["DAI", { ethReserve: "100000", tokenReserve: "100000", totalSupply: "100000" }],
+        ["WETH", { ethReserve: "100000", tokenReserve: "100000", totalSupply: "100000" }],
+        ["MKR", { ethReserve: "100000", tokenReserve: "100000", totalSupply: "100000" }]
+      ])
+    };
+  }
+
+  async getAmountOut(tokenOut: string, ethAmount: string): Promise<string> {
+    // Get expected output amount from MockAMM
+    // This would call the MockAMM.getAmountOut function
+    return "0.95"; // Mock calculation
+  }
+
+  async addLiquidity(token: string, tokenAmount: string, ethAmount: string): Promise<string> {
+    // Add liquidity to MockAMM pool
+    const mockTxHash = `0x${Math.random().toString(16).substring(2, 66)}`;
+    return mockTxHash;
+  }
 }
+
+// Create a global instance for the smart contract connector
+let smartContractConnector: SmartContractConnector;
 
 const smartContractConnectorPlugin: Plugin = {
   name: "smart-contract-connector",
-  version: "1.0.0",
-  
-  async initialize(context: PluginContext) {
-    const connector = new SmartContractConnector(
-      process.env.RPC_URL || "https://mainnet.infura.io/v3/YOUR_PROJECT_ID",
-      process.env.PRIVATE_KEY || "",
-      process.env.AGENT_CONTRACT_ADDRESS || "",
-      process.env.FACTORY_CONTRACT_ADDRESS || ""
-    );
-    
-    context.set("smartContractConnector", connector);
-  },
-
-  async handleMessage(message: any, context: PluginContext) {
-    const connector = context.get("smartContractConnector") as SmartContractConnector;
-    
-    if (message.text?.includes("execute trade")) {
-      const userAddress = message.userAddress || "0x...";
-      const preferences = await connector.getUserPreferences(userAddress);
-      
-      const sentimentAnalysis = {
-        sentimentScore: 0.8,
-        recommendedAction: "buy",
-        tokenPair: "ETH/USDC",
-        amount: "0.1"
-      };
-      
-      const tradeData = await connector.createTradePlan(sentimentAnalysis);
-      const signature = "0x..."; // Mock signature
-      const txHash = await connector.executeTrade(tradeData, signature);
-      
-      return {
-        text: `Trade executed successfully! Transaction: ${txHash}`,
-        action: "EXECUTE_TRADE"
-      };
-    }
-    
-    return null;
-  }
+  description: "Connects to smart contracts for trading operations with MockAMM integration"
 };
+
+// Initialize function to be called when the plugin is loaded
+export function initializeSmartContractConnector() {
+  smartContractConnector = new SmartContractConnector(
+    process.env.RPC_URL || "https://mainnet.infura.io/v3/YOUR_PROJECT_ID",
+    process.env.PRIVATE_KEY || "",
+    process.env.AGENT_CONTRACT_ADDRESS || "",
+    process.env.FACTORY_CONTRACT_ADDRESS || "",
+    process.env.MOCK_AMM_ADDRESS || ""
+  );
+}
+
+// Export the connector instance
+export function getSmartContractConnector(): SmartContractConnector {
+  if (!smartContractConnector) {
+    initializeSmartContractConnector();
+  }
+  return smartContractConnector;
+}
 
 export default smartContractConnectorPlugin;

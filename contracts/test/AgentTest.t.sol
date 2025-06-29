@@ -9,6 +9,7 @@ import {Platform} from "../src/PlatformType.sol";
 import {MockDAI} from "../src/mocks/MockDAI.sol";
 import {MockMKR} from "../src/mocks/MockMKR.sol";
 import {MockWETH} from "../src/mocks/MockWETH.sol";
+import {MockAMM} from "../src/amm/MockAMM.sol";
 
 contract AgentTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -20,6 +21,7 @@ contract AgentTest is Test {
     MockDAI dai;
     MockMKR mkr;
     MockWETH weth;
+    MockAMM mockAMM;
     address authorizedSigner;
     address owner = makeAddr("owner");
     uint256 constant INITIAL_BALANCE = 100 ether;
@@ -51,6 +53,21 @@ contract AgentTest is Test {
         dai = MockDAI(agentInfo.tokens[0]);
         weth = MockWETH(agentInfo.tokens[1]);
         mkr = MockMKR(agentInfo.tokens[2]);
+        mockAMM = new MockAMM();
+        // Mint tokens to owner for liquidity
+        dai.mint(owner, 100 ether);
+        weth.mint(owner, 100 ether);
+        mkr.mint(owner, 100 ether);
+        // Approve mockAMM to spend tokens
+        vm.startPrank(owner);
+        dai.approve(address(mockAMM), type(uint256).max);
+        weth.approve(address(mockAMM), type(uint256).max);
+        mkr.approve(address(mockAMM), type(uint256).max);
+        // Add liquidity to mockAMM pools
+        mockAMM.addLiquidity{value: 10 ether}(address(dai), 10 ether);
+        mockAMM.addLiquidity{value: 10 ether}(address(weth), 10 ether);
+        mockAMM.addLiquidity{value: 10 ether}(address(mkr), 10 ether);
+        vm.stopPrank();
         testTradeData = Agent.TradeData({
             tokenOut: address(dai),
             amountIn: 1 ether,
@@ -90,12 +107,14 @@ contract AgentTest is Test {
         Agent newAgent = factory.createAgent{value: 2 ether}(
             newTokens,
             Platform.Discord,
-            authorizedSigner
+            authorizedSigner,
+            address(mockAMM)
         );
         Agent newAgentAgain = factory.createAgent{value: 3 ether}(
             newTokenAgain,
             Platform.Telegram,
-            authorizedSigner
+            authorizedSigner,
+            address(mockAMM)
         );
         AgentFactory.AgentInfo memory agentNew = factory.getAgentInfo(owner, 1);
         AgentFactory.AgentInfo memory agentNewAgain = factory.getAgentInfo(
@@ -194,7 +213,7 @@ contract AgentTest is Test {
         Agent.TradeData memory trade = Agent.TradeData({
             tokenOut: token,
             amountIn: 1,
-            minAmountOut: 1,
+            minAmountOut: 0,
             deadline: block.timestamp + 1 hours,
             nonce: 1001
         });
@@ -211,7 +230,7 @@ contract AgentTest is Test {
         Agent.TradeData memory trade = Agent.TradeData({
             tokenOut: token,
             amountIn: 1,
-            minAmountOut: 1,
+            minAmountOut: 0,
             deadline: block.timestamp + 1 hours,
             nonce: 1002
         });
@@ -230,7 +249,7 @@ contract AgentTest is Test {
         Agent.TradeData memory trade = Agent.TradeData({
             tokenOut: token,
             amountIn: 1,
-            minAmountOut: 1,
+            minAmountOut: 0,
             deadline: block.timestamp - 1,
             nonce: 1003
         });
@@ -248,7 +267,7 @@ contract AgentTest is Test {
         Agent.TradeData memory trade = Agent.TradeData({
             tokenOut: token,
             amountIn: 1,
-            minAmountOut: 1,
+            minAmountOut: 0,
             deadline: block.timestamp + 1 hours,
             nonce: 1004
         });
@@ -266,7 +285,7 @@ contract AgentTest is Test {
         Agent.TradeData memory trade = Agent.TradeData({
             tokenOut: token,
             amountIn: 1,
-            minAmountOut: 1,
+            minAmountOut: 0,
             deadline: block.timestamp + 1 hours,
             nonce: 1005
         });
@@ -285,7 +304,7 @@ contract AgentTest is Test {
         Agent.TradeData memory trade = Agent.TradeData({
             tokenOut: token,
             amountIn: 1,
-            minAmountOut: 1,
+            minAmountOut: 0,
             deadline: block.timestamp + 1 hours,
             nonce: 12345
         });

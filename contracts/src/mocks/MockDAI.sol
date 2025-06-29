@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 /*//////////////////////////////////////////////////////////////
                             IMPORTS
 //////////////////////////////////////////////////////////////*/
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "../../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 contract MockDAI is ERC20 {
     /*//////////////////////////////////////////////////////////////
