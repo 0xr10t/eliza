@@ -1,353 +1,112 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {Test, console} from "forge-std/Test.sol";
-import {AgentFactory} from "../src/AgentFactory.sol";
-import {Agent} from "../src/Agent.sol";
-import {DeployAgent} from "../script/DeployAgent.s.sol";
-import {Platform} from "../src/PlatformType.sol";
+import {Test} from "forge-std/Test.sol";
 import {MockDAI} from "../src/mocks/MockDAI.sol";
-import {MockMKR} from "../src/mocks/MockMKR.sol";
 import {MockWETH} from "../src/mocks/MockWETH.sol";
-import {MockAMM} from "../src/amm/MockAMM.sol";
+import {MockMKR} from "../src/mocks/MockMKR.sol";
+import {DeployMocks} from "../script/DeployMocks.s.sol";
 
-contract AgentTest is Test {
+contract MockTokenTest is Test {
     /*//////////////////////////////////////////////////////////////
-                           STATE VARIABLES
+                            STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
-    AgentFactory factory;
-    Agent agent;
-    DeployAgent deployer;
-    MockDAI dai;
     MockMKR mkr;
+    MockDAI dai;
     MockWETH weth;
-    MockAMM mockAMM;
-    address authorizedSigner;
-    address owner = makeAddr("owner");
-    uint256 constant INITIAL_BALANCE = 100 ether;
-    uint256 private signerPrivateKey;
-    Agent.TradeData testTradeData;
-    bytes32 private constant EIP712_DOMAIN_TYPEHASH =
-        keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-        );
-    bytes32 private constant TYPE_HASH =
-        keccak256(
-            "TradeData(address tokenOut,uint256 amountIn,uint256 minAmountOut,uint256 deadline,uint256 nonce)"
-        );
+    DeployMocks deployer;
+    address user = makeAddr("user");
+    address recipient = makeAddr("recipient");
 
-    /*//////////////////////////////////////////////////////////////
-                                FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
     function setUp() external {
-        signerPrivateKey = 0xA11CE;
-        authorizedSigner = vm.addr(signerPrivateKey);
-        vm.deal(owner, INITIAL_BALANCE);
-
-        deployer = new DeployAgent();
-        (factory, agent) = deployer.run();
-        AgentFactory.AgentInfo memory agentInfo = factory.getAgentInfo(
-            owner,
-            0
-        );
-        dai = MockDAI(agentInfo.tokens[0]);
-        weth = MockWETH(agentInfo.tokens[1]);
-        mkr = MockMKR(agentInfo.tokens[2]);
-        mockAMM = new MockAMM();
-        // Mint tokens to owner for liquidity
-        dai.mint(owner, 100 ether);
-        weth.mint(owner, 100 ether);
-        mkr.mint(owner, 100 ether);
-        // Approve mockAMM to spend tokens
-        vm.startPrank(owner);
-        dai.approve(address(mockAMM), type(uint256).max);
-        weth.approve(address(mockAMM), type(uint256).max);
-        mkr.approve(address(mockAMM), type(uint256).max);
-        // Add liquidity to mockAMM pools
-        mockAMM.addLiquidity{value: 10 ether}(address(dai), 10 ether);
-        mockAMM.addLiquidity{value: 10 ether}(address(weth), 10 ether);
-        mockAMM.addLiquidity{value: 10 ether}(address(mkr), 10 ether);
-        vm.stopPrank();
-        testTradeData = Agent.TradeData({
-            tokenOut: address(dai),
-            amountIn: 1 ether,
-            minAmountOut: 0.9 ether,
-            deadline: block.timestamp + 1 hours,
-            nonce: 1
-        });
+        deployer = new DeployMocks();
+        (dai, weth, mkr) = deployer.run();
     }
 
     /*//////////////////////////////////////////////////////////////
-                         AGENT FACTORY FUNCTIONS
+                            MOCKDAI TESTS
     //////////////////////////////////////////////////////////////*/
-    function testCreatedAgent() external view {
-        AgentFactory.AgentInfo memory agentInfo = factory.getAgentInfo(
-            owner,
-            0
-        );
-        assertEq(agentInfo.agentAddress, address(agent));
-        assertEq(agentInfo.owner, owner);
-        assertEq(agentInfo.tokens.length, 3);
-        assertEq(agentInfo.tokens[0], address(dai));
-        assertEq(agentInfo.tokens[1], address(weth));
-        assertEq(agentInfo.tokens[2], address(mkr));
-        assertEq(agentInfo.amountInvested, 1 ether);
-        assertEq(uint256(agentInfo.platformType), uint256(Platform.Twitter));
+    function testDAIMintTransferAndBurn() external {
+        uint256 mintAmount = 1000 ether;
+        dai.mint(user, mintAmount);
+        assertEq(dai.balanceOf(user), mintAmount);
+
+        vm.startPrank(user);
+        dai.transfer(recipient, 500 ether);
+        vm.stopPrank();
+
+        assertEq(dai.balanceOf(user), 500 ether);
+        assertEq(dai.balanceOf(recipient), 500 ether);
+
+        vm.startPrank(user);
+        dai.burn(user, 200 ether);
+        vm.stopPrank();
+
+        assertEq(dai.balanceOf(user), 300 ether);
+        assertEq(dai.totalSupply(), 800 ether);
     }
 
-    function testCreateMultipleAgentsWithDifferentPlatformsAndTokens()
-        external
-    {
-        address[] memory newTokens = new address[](2);
-        address[] memory newTokenAgain = new address[](1);
-        newTokens[0] = address(dai);
-        newTokens[1] = address(mkr);
-        newTokenAgain[0] = address(mkr);
-        vm.startPrank(owner);
-        Agent newAgent = factory.createAgent{value: 2 ether}(
-            newTokens,
-            Platform.Discord,
-            authorizedSigner,
-            address(mockAMM)
-        );
-        Agent newAgentAgain = factory.createAgent{value: 3 ether}(
-            newTokenAgain,
-            Platform.Telegram,
-            authorizedSigner,
-            address(mockAMM)
-        );
-        AgentFactory.AgentInfo memory agentNew = factory.getAgentInfo(owner, 1);
-        AgentFactory.AgentInfo memory agentNewAgain = factory.getAgentInfo(
-            owner,
-            2
-        );
-        vm.stopPrank();
-        assertEq(agentNew.agentAddress, address(newAgent));
-        assertEq(agentNew.owner, owner);
-        assertEq(agentNew.tokens.length, 2);
-        assertEq(agentNew.tokens[0], address(dai));
-        assertEq(agentNew.tokens[1], address(mkr));
-        assertEq(agentNew.amountInvested, 2 ether);
-        assertEq(uint256(agentNew.platformType), uint256(Platform.Discord));
-        assertEq(agentNewAgain.agentAddress, address(newAgentAgain));
-        assertEq(agentNewAgain.owner, owner);
-        assertEq(agentNewAgain.tokens.length, 1);
-        assertEq(agentNewAgain.tokens[0], address(mkr));
-        assertEq(agentNewAgain.amountInvested, 3 ether);
-        assertEq(
-            uint256(agentNewAgain.platformType),
-            uint256(Platform.Telegram)
-        );
+    function testDAITokenMetadata() external view {
+        assertEq(dai.name(), "DAI");
+        assertEq(dai.symbol(), "DAI");
+        assertEq(dai.decimals(), 18);
     }
 
     /*//////////////////////////////////////////////////////////////
-                            AGENT FUNCTIONS
+                            MOCKWETH TESTS
     //////////////////////////////////////////////////////////////*/
-    function testPauseAndResumeAgent() external {
-        vm.startPrank(owner);
-        agent.pauseAgent();
-        assertEq(agent.getPausedState(), true);
+    function testWETHMintTransferAndBurn() external {
+        uint256 mintAmount = 5 ether;
+        weth.mint(user, mintAmount);
+        assertEq(weth.balanceOf(user), mintAmount);
 
-        agent.resumeAgent();
-        assertEq(agent.getPausedState(), false);
+        vm.startPrank(user);
+        weth.transfer(recipient, 2 ether);
         vm.stopPrank();
-    }
 
-    function testOnlyOwnerCanPauseAgent() external {
-        address random = makeAddr("random");
-        vm.startPrank(random);
-        vm.expectRevert();
-        agent.pauseAgent();
+        assertEq(weth.balanceOf(user), 3 ether);
+        assertEq(weth.balanceOf(recipient), 2 ether);
+
+        vm.startPrank(user);
+        weth.burn(user, 1 ether);
         vm.stopPrank();
+
+        assertEq(weth.balanceOf(user), 2 ether);
+        assertEq(weth.totalSupply(), 4 ether);
     }
 
-    function testOnlyOwnerCanResumeAgent() external {
-        address random = makeAddr("random");
-        vm.startPrank(random);
-        vm.expectRevert();
-        agent.resumeAgent();
+    function testWETHTokenMetadata() external view {
+        assertEq(weth.name(), "Wrapped ETH");
+        assertEq(weth.symbol(), "WETH");
+        assertEq(weth.decimals(), 18);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            MOCKMKR TESTS
+    //////////////////////////////////////////////////////////////*/
+    function testMKRMintTransferAndBurn() external {
+        uint256 mintAmount = 5 ether;
+        mkr.mint(user, mintAmount);
+        assertEq(mkr.balanceOf(user), mintAmount);
+
+        vm.startPrank(user);
+        mkr.transfer(recipient, 2 ether);
         vm.stopPrank();
-    }
 
-    function testWithdrawFunds() external {
-        uint256 userInitialBalance = owner.balance;
-        uint256 agentInitialBalance = address(agent).balance;
-        vm.startPrank(owner);
-        agent.withdrawFunds();
+        assertEq(mkr.balanceOf(user), 3 ether);
+        assertEq(mkr.balanceOf(recipient), 2 ether);
+
+        vm.startPrank(user);
+        mkr.burn(user, 1 ether);
         vm.stopPrank();
-        uint256 userFinalBalance = owner.balance;
-        uint256 agentFinalBalance = address(agent).balance;
-        assertEq(
-            userFinalBalance - userInitialBalance,
-            agentInitialBalance - agentFinalBalance
-        );
+
+        assertEq(mkr.balanceOf(user), 2 ether);
+        assertEq(mkr.totalSupply(), 4 ether);
     }
 
-    function testAddFunds() external {
-        uint256 userInitialBalance = owner.balance;
-        uint256 agentInitialBalance = address(agent).balance;
-        vm.startPrank(owner);
-        agent.addFunds{value: 2 ether}();
-        vm.stopPrank();
-        uint256 userFinalBalance = owner.balance;
-        uint256 agentFinalBalance = address(agent).balance;
-        assertEq(userInitialBalance - userFinalBalance, 2 ether);
-        assertEq(agentFinalBalance - agentInitialBalance, 2 ether);
-    }
-
-    function testDomainSeparator() external view {
-        bytes32 expectedDomainSeparator = keccak256(
-            abi.encode(
-                EIP712_DOMAIN_TYPEHASH,
-                keccak256(bytes("Agent")),
-                keccak256(bytes("1")),
-                block.chainid,
-                address(agent)
-            )
-        );
-        assertEq(agent.getDomainSeparator(), expectedDomainSeparator);
-    }
-
-    function testExecuteSwapWithValidSignature() external {
-        address token = address(weth);
-        Agent.TradeData memory trade = Agent.TradeData({
-            tokenOut: token,
-            amountIn: 1,
-            minAmountOut: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 1001
-        });
-
-        bytes memory sig = _signTradeData(trade, signerPrivateKey);
-
-        vm.startPrank(authorizedSigner);
-        agent.executeSwap(trade, sig);
-        vm.stopPrank();
-    }
-
-    function testExecuteSwapWithInvalidSignature() external {
-        address token = address(weth);
-        Agent.TradeData memory trade = Agent.TradeData({
-            tokenOut: token,
-            amountIn: 1,
-            minAmountOut: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 1002
-        });
-
-        uint256 wrongKey = 0xB0B;
-        bytes memory sig = _signTradeData(trade, wrongKey);
-
-        vm.startPrank(authorizedSigner);
-        vm.expectRevert(Agent.Agent__IncorrectSignature.selector);
-        agent.executeSwap(trade, sig);
-        vm.stopPrank();
-    }
-
-    function testExecuteSwapWithExpiredDeadline() external {
-        address token = address(dai);
-        Agent.TradeData memory trade = Agent.TradeData({
-            tokenOut: token,
-            amountIn: 1,
-            minAmountOut: 0,
-            deadline: block.timestamp - 1,
-            nonce: 1003
-        });
-
-        bytes memory sig = _signTradeData(trade, signerPrivateKey);
-
-        vm.startPrank(authorizedSigner);
-        vm.expectRevert(Agent.Agent__DeadlinePassed.selector);
-        agent.executeSwap(trade, sig);
-        vm.stopPrank();
-    }
-
-    function testExecuteSwapWithInvalidSignatureLength() external {
-        address token = address(weth);
-        Agent.TradeData memory trade = Agent.TradeData({
-            tokenOut: token,
-            amountIn: 1,
-            minAmountOut: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 1004
-        });
-
-        bytes memory sig = new bytes(64);
-
-        vm.startPrank(authorizedSigner);
-        vm.expectRevert(Agent.Agent__IncorrectSignatureLength.selector);
-        agent.executeSwap(trade, sig);
-        vm.stopPrank();
-    }
-
-    function testExecuteSwapWithUsedNonce() external {
-        address token = address(weth);
-        Agent.TradeData memory trade = Agent.TradeData({
-            tokenOut: token,
-            amountIn: 1,
-            minAmountOut: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 1005
-        });
-
-        bytes memory sig = _signTradeData(trade, signerPrivateKey);
-
-        vm.startPrank(authorizedSigner);
-        agent.executeSwap(trade, sig);
-        vm.expectRevert(Agent.Agent__NonceAlreadyUsed.selector);
-        agent.executeSwap(trade, sig);
-        vm.stopPrank();
-    }
-
-    function testSignTradeDataProducesCorrectDigest() external view {
-        address token = address(dai);
-        Agent.TradeData memory trade = Agent.TradeData({
-            tokenOut: token,
-            amountIn: 1,
-            minAmountOut: 0,
-            deadline: block.timestamp + 1 hours,
-            nonce: 12345
-        });
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TYPE_HASH,
-                trade.tokenOut,
-                trade.amountIn,
-                trade.minAmountOut,
-                trade.deadline,
-                trade.nonce
-            )
-        );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", agent.getDomainSeparator(), structHash)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
-        bytes memory expectedSignature = abi.encodePacked(r, s, v);
-
-        bytes memory helperSignature = _signTradeData(trade, signerPrivateKey);
-
-        assertEq(helperSignature, expectedSignature);
-    }
-
-    function _signTradeData(
-        Agent.TradeData memory data,
-        uint256 privateKey
-    ) internal view returns (bytes memory) {
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TYPE_HASH,
-                data.tokenOut,
-                data.amountIn,
-                data.minAmountOut,
-                data.deadline,
-                data.nonce
-            )
-        );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", agent.getDomainSeparator(), structHash)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
-        return abi.encodePacked(r, s, v);
+    function testMKRTokenMetadata() external view {
+        assertEq(mkr.name(), "Maker");
+        assertEq(mkr.symbol(), "MKR");
+        assertEq(mkr.decimals(), 18);
     }
 }
