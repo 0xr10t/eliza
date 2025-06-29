@@ -1,7 +1,7 @@
 import { Character, defaultCharacter, ModelProviderName } from "@elizaos/core";
-import tradePlannerPlugin from "./plugins/trade-planner.ts";
-import tradingActionsPlugin from "./plugins/trading-actions.ts";
-import twitterSentimentPlugin from "./plugins/twitter-sentiment.ts";
+import tradePlannerPlugin from "./plugins/trade-planner.js";
+import tradingActionsPlugin from "./plugins/trading-actions.js";
+import twitterSentimentPlugin from "./plugins/twitter-sentiment.js";
 
 export const character: Character = {
     ...defaultCharacter,

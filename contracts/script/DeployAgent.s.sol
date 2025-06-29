@@ -48,19 +48,42 @@ contract DeployAgent is Script {
         mkr.mint(owner, 1_000_000 ether);
         weth.mint(owner, 1_000_000 ether);
 
-        _createPoolsAndAddLiquidity();
-
         AgentFactory factory = new AgentFactory();
         address[] memory tokenArray = new address[](3);
         tokenArray[0] = address(dai);
         tokenArray[1] = address(weth);
         tokenArray[2] = address(mkr);
+
+        // Create pool creation data for each token
+        Agent.PoolCreationData[] memory poolData = new Agent.PoolCreationData[](3);
+        poolData[0] = Agent.PoolCreationData({
+            token: address(dai),
+            initialLiquidity: 100_000 ether
+        });
+        poolData[1] = Agent.PoolCreationData({
+            token: address(weth),
+            initialLiquidity: 100_000 ether
+        });
+        poolData[2] = Agent.PoolCreationData({
+            token: address(mkr),
+            initialLiquidity: 100_000 ether
+        });
+
         Agent agent = factory.createAgent{value: 1 ether}(
             tokenArray,
             Platform.Twitter,
             authorizedSigner,
             address(mockAMM)
         );
+
+        // Mint tokens to the agent
+        dai.mint(address(agent), 100_000 ether);
+        weth.mint(address(agent), 100_000 ether);
+        mkr.mint(address(agent), 100_000 ether);
+
+        // Create pools
+        agent.createPools(poolData);
+
         vm.stopBroadcast();
         return (factory, agent);
     }

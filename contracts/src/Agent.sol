@@ -10,6 +10,12 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 import {Platform} from "./PlatformType.sol";
 import {IMockAMM} from "./amm/IMockAMM.sol";
 
+/// @title Mock Token Interface
+/// @notice Interface for mock tokens that support minting
+interface IMockToken {
+    function mint(address to, uint256 amount) external;
+}
+
 /// @title Agent
 /// @notice Represents an individual trading agent that can execute trades based on authorized signatures
 contract Agent is ReentrancyGuard {
@@ -30,6 +36,7 @@ contract Agent is ReentrancyGuard {
     error Agent__NotAuthorized();
     error Agent__AmountIsZero();
     error Agent__TokenTransferFailed();
+    error Agent__PoolCreationFailed();
 
     /*//////////////////////////////////////////////////////////////
                               TYPE VARIABLES
@@ -46,6 +53,14 @@ contract Agent is ReentrancyGuard {
         uint256 minAmountOut;
         uint256 deadline;
         uint256 nonce;
+    }
+
+    /// @notice Structure to hold pool creation data
+    /// @param token The token address
+    /// @param initialLiquidity The initial liquidity amount for the pool
+    struct PoolCreationData {
+        address token;
+        uint256 initialLiquidity;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -102,6 +117,14 @@ contract Agent is ReentrancyGuard {
     event Agent__TokensTransferredToOwner(
         address indexed token,
         uint256 amount
+    );
+    /// @param token The token address for which pool was created
+    /// @param ethAmount The amount of ETH added to pool
+    /// @param tokenAmount The amount of tokens added to pool
+    event Agent__PoolCreated(
+        address indexed token,
+        uint256 ethAmount,
+        uint256 tokenAmount
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -171,6 +194,39 @@ contract Agent is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                            PUBLIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+    /// @notice Creates pools and adds initial liquidity for the provided tokens
+    /// @param _poolCreationData Array of pool creation data
+    function createPools(PoolCreationData[] memory _poolCreationData) external onlyOwner {
+        for (uint256 i = 0; i < _poolCreationData.length; i++) {
+            PoolCreationData memory data = _poolCreationData[i];
+            
+            // Check if token is supported
+            if (!tokensPresent[data.token]) {
+                continue;
+            }
+
+            // Check if agent has enough tokens
+            uint256 tokenBalance = IERC20(data.token).balanceOf(address(this));
+            require(tokenBalance >= data.initialLiquidity, "Insufficient token balance");
+            
+            // Check if agent has enough ETH
+            require(address(this).balance >= data.initialLiquidity, "Insufficient ETH balance");
+            
+            // Approve tokens for MockAMM
+            IERC20(data.token).approve(address(i_mockAMM), data.initialLiquidity);
+            
+            // Add liquidity to create the pool
+            try i_mockAMM.addLiquidity{value: data.initialLiquidity}(
+                data.token,
+                data.initialLiquidity
+            ) returns (uint256 lpTokens) {
+                emit Agent__PoolCreated(data.token, data.initialLiquidity, data.initialLiquidity);
+            } catch {
+                revert Agent__PoolCreationFailed();
+            }
+        }
+    }
+
     /// @notice Pauses the agent
     function pauseAgent() public onlyOwner {
         if (isPaused) {
@@ -373,4 +429,10 @@ contract Agent is ReentrancyGuard {
     function getMockAMM() external view returns (address) {
         return address(i_mockAMM);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            RECEIVE & FALLBACK
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Allows the contract to receive ETH
+    receive() external payable {}
 }

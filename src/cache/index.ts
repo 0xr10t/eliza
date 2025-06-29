@@ -1,4 +1,3 @@
-
 import { CacheManager, Character, DbCacheAdapter, IDatabaseCacheAdapter } from "@elizaos/core";
 
 export function initializeDbCache(

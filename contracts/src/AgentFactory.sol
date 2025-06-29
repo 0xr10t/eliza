@@ -100,6 +100,64 @@ contract AgentFactory {
         return agent;
     }
 
+    /// @notice Creates a new trading agent with default pool creation data
+    /// @param _tokens Array of token addresses that the agent will support
+    /// @param _platformType The platform type for the agent (Twitter, Telegram, or Discord)
+    /// @param authorizedSigner Address that will be authorized to execute trades
+    /// @param _mockAMM The address of the MockAMM contract
+    /// @param _defaultLiquidity Default liquidity amount for each token pool
+    /// @return agent The address of the newly created Agent contract
+    function createAgentWithDefaultPools(
+        address[] memory _tokens,
+        Platform _platformType,
+        address authorizedSigner,
+        address _mockAMM,
+        uint256 _defaultLiquidity
+    ) external payable returns (Agent) {
+        if (_tokens.length == 0) {
+            revert Factory__NoTokenPresent();
+        }
+        if (!isValidPlatform(_platformType)) {
+            revert Factory__PlatformNotAvailable();
+        }
+        if (msg.value <= 0) {
+            revert Factory__AmountIsZero();
+        }
+
+        // Create the agent first
+        Agent agent = new Agent{value: msg.value}(
+            _tokens,
+            _platformType,
+            authorizedSigner,
+            msg.sender,
+            _mockAMM
+        );
+
+        // Create default pool creation data for all tokens
+        Agent.PoolCreationData[] memory poolData = new Agent.PoolCreationData[](_tokens.length);
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            poolData[i] = Agent.PoolCreationData({
+                token: _tokens[i],
+                initialLiquidity: _defaultLiquidity
+            });
+        }
+
+        // Call createPools on the agent
+        agent.createPools(poolData);
+
+        AgentInfo memory info = AgentInfo({
+            agentAddress: address(agent),
+            owner: msg.sender,
+            tokens: _tokens,
+            amountInvested: msg.value,
+            platformType: _platformType
+        });
+
+        userToAgents[msg.sender].push(info);
+        emit Factory__AgentCreated(address(agent), _platformType, _tokens);
+        return agent;
+    }
+
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
