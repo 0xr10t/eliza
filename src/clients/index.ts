@@ -16,8 +16,17 @@ export async function initializeClients(
     if (autoClient) clients.push(autoClient);
   }
 
+  // Only initialize Discord if explicitly requested in character configuration
   if (clientTypes.includes("discord")) {
-    clients.push(await DiscordClientInterface.start(runtime));
+    try {
+      const discordClient = await DiscordClientInterface.start(runtime);
+      if (discordClient) {
+        clients.push(discordClient);
+        console.log("Discord client initialized successfully");
+      }
+    } catch (error) {
+      console.error("Failed to initialize Discord client:", error);
+    }
   }
 
   if (clientTypes.includes("telegram")) {
