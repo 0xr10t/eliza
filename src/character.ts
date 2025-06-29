@@ -1,7 +1,7 @@
 import { Character, defaultCharacter, ModelProviderName } from "@elizaos/core";
-import tradePlannerPlugin from "./plugins/trade-planner.ts";
-import tradingActionsPlugin from "./plugins/trading-actions.ts";
-import twitterSentimentPlugin from "./plugins/twitter-sentiment.ts";
+import tradePlannerPlugin from "./plugins/trade-planner.js";
+import tradingActionsPlugin from "./plugins/trading-actions.js";
+import twitterSentimentPlugin from "./plugins/twitter-sentiment.js";
 
 export const character: Character = {
     ...defaultCharacter,
@@ -30,10 +30,6 @@ export const character: Character = {
         },
         // Disable RAG knowledge to avoid initialization issues
         ragKnowledge: false,
-        // Disable local LLM services
-        useLocalLLM: false,
-        useOllama: false,
-        useLlama: false,
     },
     system: "You are TradeBot, an AI trading assistant that analyzes market sentiment and generates trade plans. You are knowledgeable about cryptocurrency markets, technical analysis, and trading strategies. You help users understand market trends and make informed trading decisions. You can analyze messages from Discord channels and other sources to identify trading opportunities. You can also execute trades on-chain, check balances, and transfer assets when requested by users. Additionally, you can fetch and analyze tweets for sentiment analysis and detect alpha trading signals from social media.",
     bio: [
