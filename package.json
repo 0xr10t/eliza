@@ -13,6 +13,7 @@
     "test:twitter": "node test-twitter-sentiment.js",
     "test:scraper": "node test-twitter-scraper.js",
     "test:scraper-simple": "node test-twitter-scraper-simple.js",
+    "test:automated": "node test-automated-trading.js",
     "clean": "./scripts/clean.sh",
     "start:simple": "tsc && node --loader ts-node/esm src/simple-trading-bot.ts",
     "start:service:all": "pm2 start pnpm --name=\"all\" --restart-delay=3000 --max-restarts=10 -- run start:all",

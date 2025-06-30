@@ -23,6 +23,7 @@ import {
 } from "./config/index.js";
 import { initializeDatabase } from "./database/index.js";
 import tradePlannerPlugin from "./plugins/trade-planner.js";
+import automatedTradingPlugin from "./services/automated-trading.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +60,7 @@ export function createAgent(
       bootstrapPlugin,
       nodePlugin,
       tradePlannerPlugin,
+      automatedTradingPlugin,
     ].filter(Boolean),
     providers: [],
     actions: [],
